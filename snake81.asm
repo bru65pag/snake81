@@ -19,6 +19,7 @@ include 'SINCL-ZX\ZX81.INC'		 // definitions of constants
 ; If snake finds a pill, snake size grows by one black square
 ;
 ; V2: the logic is there.
+;     bug001 fixed: score is reset when game restarts
 ;     Still missing: levels and best score
 
    1 REM SNAKE V2
@@ -36,13 +37,16 @@ LOOP7:
 	inc hl
 	jp LOOP7
 END_CLEAR_SBODY:
-
-;  print string "SCORE=000" at 0,0
+;  print string "SCORE=" at 0,0
 	ld  d,0
 	ld  e,0
 	ld hl,STR_SCORE
 	call PRINT_STRING
-
+; reset SCORE to zero
+	ld hl,SCORE
+	ld (hl),$00
+; update and print SCORE
+	call FUNC_PRINT_SCORE
 ;  print string "LEVEL=" at 0,24
 	ld  d,0
 	ld  e,24
@@ -245,17 +249,9 @@ END_DIR:
 	jp nz,NO_PILL
 ; snake ate pill
 	// update score
-	ld de,STR_SCORE+6
-	ld a,(SCORE)
-	inc a
-	ld (SCORE),a
-	ld h,0
-	ld l,a
-	call FUNC_8BIT_TO_STRING
-	ld d,0
-	ld e,6
-	ld hl, STR_SCORE+6
-	call PRINT_STRING
+	call FUNC_UPDATE_SCORE
+	// print SCORE
+	call FUNC_PRINT_SCORE
 	// print new pill on screen
 	call FUNC_NEW_PILL
 	// and loop
@@ -291,6 +287,26 @@ FUNC_NEW_PILL:
 	ld e,a
 	call FUNC_GET_DFILE_ADDRESS
 	ld (hl),$34
+	ret
+
+////////////////////////
+FUNC_UPDATE_SCORE:
+	ld a,(SCORE)
+	inc a
+	ld (SCORE),a
+	ret
+
+////////////////////////
+FUNC_PRINT_SCORE:
+	ld de,STR_SCORE+6
+	ld h,0
+	ld a,(SCORE)
+	ld l,a
+	call FUNC_8BIT_TO_STRING
+	ld d,0
+	ld e,6
+	ld hl, STR_SCORE+6
+	call PRINT_STRING
 	ret
 
 ////////////////////////
@@ -487,7 +503,6 @@ SBODY:				       // snake positions
 
 LEVEL:		db $00
 SCORE:		db $00
-
 STR_SCORE:	dbzx 'SCORE=000'
 		db $FF
 STR_LEVEL:	dbzx 'LEVEL='
@@ -501,7 +516,7 @@ STR_LEVEL_3:	  dbzx 'PYTHON'
 END _asm
 
 
-40 PRINT USR #START
+40 RAND USR #START
 
 include 'SINCL-ZX\ZX81DISP.INC' 	  ; include D_FILE and needed memory areas
 VARS_ADDR:
