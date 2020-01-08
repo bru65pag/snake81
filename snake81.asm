@@ -7,26 +7,53 @@ MEMAVL	 =	   MEM_16K		  // can be MEM_1K, MEM_2K, MEM_4K, MEM_8K, MEM_16K, MEM_3
 									// default value is MEM_16K
 STARTMODE  EQU	 SLOW_MODE		// SLOW or FAST
 DFILETYPE  EQU	 AUTO			 // COLLAPSED or EXPANDED or AUTO
-STARTUPMSG EQU	'SNAKE V2 ASM'	   // any message will be shown on screen after loading, max. 32 chars
+STARTUPMSG EQU	'SNAKE81 V3'	 // any message will be shown on screen after loading, max. 32 chars
 
 include 'SINCL-ZX\ZX81.INC'		 // definitions of constants
-; THE DESIGN
-; 3 levels: SLUG, WORM, PYTHON
-; Score starts at 0 and increases each time the snake size increases
-; The snake is represented by a black square.
-; Initial move is random (left, right, up, down)
-; Snake moves in the same direction until a key is hit
-; If snake finds a pill, snake size grows by one black square
-;
-; V2: the logic is there.
-;     bug001 fixed: score is reset when game restarts
-;     Still missing: levels and best score
 
-   1 REM SNAKE V2
+
+   1 REM SNAKE81 V3
 
    2 REM _asm
 
 START:
+; chose level
+	// print chose level
+	ld d,11
+	ld e,10
+	ld hl, STR_PICK_LEVEL
+	call PRINT_STRING
+	// print SLUG WORM PYTHON
+	ld d,15
+	ld e,8
+	ld hl, STR_LEVELS
+	call PRINT_STRING
+S_KEY:
+	ld a,$FD
+	in a,($FE)
+	bit 1,a
+	jp nz,W_KEY
+	ld a,1
+	ld (LEVEL),a
+	jp END_CHOSE_LEVEL
+W_KEY:
+	ld a,$FB
+	in a,($FE)
+	bit 1,a
+	jp nz,P_KEY
+	ld a,2
+	ld (LEVEL),a
+	jp END_CHOSE_LEVEL
+P_KEY:
+	ld a,$DF
+	in a,($FE)
+	bit 0,a
+	jp nz,S_KEY
+	ld a,3
+	ld (LEVEL),a
+END_CHOSE_LEVEL:
+
+
 ; clear SBODY
 	ld hl,SBODY
 LOOP7:
@@ -37,23 +64,72 @@ LOOP7:
 	inc hl
 	jp LOOP7
 END_CLEAR_SBODY:
-;  print string "SCORE=" at 0,0
+
+; init SCORE
+	// print "SCORE=000" at 0,0
 	ld  d,0
 	ld  e,0
 	ld hl,STR_SCORE
 	call PRINT_STRING
-; reset SCORE to zero
+	// reset SCORE to zero
 	ld hl,SCORE
 	ld (hl),$00
-; update and print SCORE
 	call FUNC_PRINT_SCORE
-;  print string "LEVEL=" at 0,24
-	ld  d,0
-	ld  e,24
-	ld hl,STR_LEVEL
-	call PRINT_STRING
-; print level
 
+
+; print level and init BSCORE
+	ld hl,LEVEL
+	ld a,(hl)
+	cp 1
+	jp nz,LEVEL2
+	// init BSCORE with value of BSCORE_SLUG
+	ld a,(BSCORE_SLUG)
+	ld (BSCORE),a
+	// print LEVEL=SLUG
+	ld d,0
+	ld e,21
+	ld hl,STR_LEVEL_WORM
+	call PRINT_STRING
+	ld a,20
+	ld (WAIT_TIME),a
+	jp INIT_SNAKE
+LEVEL2:
+	cp 2
+	jp nz,LEVEL3
+	// init BSCORE with address of BSCORE_WORM
+	ld a,(BSCORE_WORM)
+	ld (BSCORE),a
+	// print LEVEL=WORM
+	ld d,0
+	ld e,21
+	ld hl,STR_LEVEL_WORM
+	call PRINT_STRING
+	ld a,10
+	ld (WAIT_TIME),a
+	jp INIT_SNAKE
+
+LEVEL3:
+	// init BSCORE with address of BSCORE_PYTHON
+	ld a,(BSCORE_PYTHON)
+	ld (BSCORE),a
+	// print LEVEL=PYTHON
+	ld d,0
+	ld e,21
+	ld hl,STR_LEVEL_PYTHON
+	call PRINT_STRING
+	ld a,5
+	ld (WAIT_TIME),a
+
+; print BEST=xxx
+	ld  d,0
+	ld  e,11
+	ld hl,STR_BSCORE
+	call PRINT_STRING
+	// pull best score
+	ld a,(BSCORE)
+	call FUNC_PRINT_BSCORE
+
+INIT_SNAKE:
 ; snake initial random position in HLINE, HCOL
 ; HLINE = 2+INT(RND*20), HCOL = 2+INT(RND*29)
 	ld b,20
@@ -231,10 +307,11 @@ END_DIR:
 	ld e,(hl)
 	call FUNC_IS_SBODY_PART
 	cp 1
-	ret z
+	jp z,LOST
 ; print new head
 	call FUNC_ADD_HEAD
-	ld b,2
+	ld a,(WAIT_TIME)
+	ld b,a
 	call FUNC_WAIT
 ; check if snake ate pill
 	ld a,(PLINE)
@@ -252,6 +329,7 @@ END_DIR:
 	call FUNC_UPDATE_SCORE
 	// print SCORE
 	call FUNC_PRINT_SCORE
+	call FUNC_PRINT_BSCORE
 	// print new pill on screen
 	call FUNC_NEW_PILL
 	// and loop
@@ -261,6 +339,26 @@ NO_PILL:
 	// erase tail
 	call FUNC_ERASE_TAIL
 	jp MAIN_LOOP
+
+LOST:
+; save BSCORE
+       ld a,(LEVEL)
+       cp 1
+       jp nz,LOST_L2
+       ld a,(BSCORE)
+       ld (BSCORE_SLUG),a
+       jp END_LOST
+LOST_L2:
+	cp 2
+	jp nz,LOST_L3
+	ld a,(BSCORE)
+	ld (BSCORE_WORM),a
+	jp END_LOST
+LOST_L3:
+	 ld a,(BSCORE)
+	 ld (BSCORE_PYTHON),a
+END_LOST:
+	jp START
 
 FUNC_NEW_PILL:
 	// compute new pill location in (PLINE,PCOL)
@@ -294,6 +392,11 @@ FUNC_UPDATE_SCORE:
 	ld a,(SCORE)
 	inc a
 	ld (SCORE),a
+	ld b,a
+	ld a,(BSCORE)
+	ret c		// SCORE < BSCORE
+	ld a,b		// SCORE >=BSCORE
+	ld (BSCORE),a
 	ret
 
 ////////////////////////
@@ -306,6 +409,19 @@ FUNC_PRINT_SCORE:
 	ld d,0
 	ld e,6
 	ld hl, STR_SCORE+6
+	call PRINT_STRING
+	ret
+
+////////////////////////
+FUNC_PRINT_BSCORE:
+	ld de,STR_BSCORE+5
+	ld h,0
+	ld a,(BSCORE)
+	ld l,a
+	call FUNC_8BIT_TO_STRING
+	ld d,0
+	ld e,16
+	ld hl, STR_BSCORE+5
 	call PRINT_STRING
 	ret
 
@@ -384,10 +500,10 @@ FOUND:
 
 ////////////////////////
 FUNC_WAIT:					  ;
-; Input: B = number of 1/10 seconds
+; Input: B = number of 1/100 seconds
 ; Each innerloop takes 21 cycles, that is 21 * 0,3077 microseconds = 6.4617 microseconds
-; repeated 2500 times gives approximately 1/10 sec
-		ld hl,2500
+; repeated 2500 times gives approximately 1/100 sec
+		ld hl,250
 WAIT_LOOP2:
 	dec	 hl			  ; 6 cycles
 	ld	  a,h			 ; 4 cycles
@@ -501,17 +617,34 @@ SBODY:				       // snake positions
 				       //
 	db 511 dup ($FF)
 
-LEVEL:		db $00
+LEVEL:		db $01
 SCORE:		db $00
+BSCORE		db $00			// initialized with BEST SCORE of level
+BSCORE_SLUG:	db $00
+BSCORE_WORM:	db $00
+BSCORE_PYTHON:	db $00
+WAIT_TIME	db $00
+
 STR_SCORE:	dbzx 'SCORE=000'
+		db $FF
+STR_BSCORE:	dbzx 'BEST=000'
 		db $FF
 STR_LEVEL:	dbzx 'LEVEL='
 		db $FF
-STR_LEVEL_1:	  dbzx 'SLUG'
+STR_LEVEL_SLUG:    dbzx 'LEVEL=SLUG'
 		db $FF
-STR_LEVEL_2:	  dbzx 'WORM'
+STR_LEVEL_WORM:    dbzx 'LEVEL=WORM'
 		db $FF
-STR_LEVEL_3:	  dbzx 'PYTHON'
+STR_LEVEL_PYTHON:    dbzx 'LEVEL=PYTHON'
+		db $FF
+STR_PICK_LEVEL: dbzx 'CHOSE LEVEL'
+		db $FF
+STR_LEVELS:	db $B8
+		dbzx 'LUG '
+		db $BC
+		dbzx 'ORM '
+		db $B5
+		dbzx 'YTHON'
 		db $FF
 END _asm
 
