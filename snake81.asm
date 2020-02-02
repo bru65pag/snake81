@@ -12,24 +12,27 @@ STARTUPMSG EQU	'SNAKE81 V3'	 // any message will be shown on screen after loadin
 include 'SINCL-ZX\ZX81.INC'		 // definitions of constants
 
 
-   1 REM SNAKE81 V3
-
-   2 REM _asm
+   1 REM _asm
 
 START:
+; print header line
+	call FUNC_PRINT_HEADER
+RESTART:
+; clear screen
+	call FUNC_CLEAR_SCREEN
 ; chose level
-	// print chose level
+	// print "chose level"
 	ld d,11
 	ld e,10
 	ld hl, STR_PICK_LEVEL
 	call PRINT_STRING
-	// print SLUG WORM PYTHON
+	// print "SLUG WORM PYTHON"
 	ld d,15
 	ld e,8
 	ld hl, STR_LEVELS
 	call PRINT_STRING
-S_KEY:
-	ld a,$FD
+CHOSE_LEVEL:
+	ld a,$FD  // S key
 	in a,($FE)
 	bit 1,a
 	jp nz,W_KEY
@@ -37,7 +40,7 @@ S_KEY:
 	ld (LEVEL),a
 	jp END_CHOSE_LEVEL
 W_KEY:
-	ld a,$FB
+	ld a,$FB   // W key
 	in a,($FE)
 	bit 1,a
 	jp nz,P_KEY
@@ -45,14 +48,67 @@ W_KEY:
 	ld (LEVEL),a
 	jp END_CHOSE_LEVEL
 P_KEY:
-	ld a,$DF
+	ld a,$DF   // P key
 	in a,($FE)
 	bit 0,a
-	jp nz,S_KEY
+	jp nz,CHOSE_LEVEL
 	ld a,3
 	ld (LEVEL),a
 END_CHOSE_LEVEL:
+; clear screen
+	call FUNC_CLEAR_SCREEN
+; reset score to 0 and print
+	ld hl,SCORE
+	ld (hl),$00
+	call FUNC_PRINT_SCORE
+; print level,set BSCORE to bscore's level, set SPEED
+LOAD_LEVEL_BSCORE_SPEED:
+	ld hl,LEVEL
+	ld a,(hl)
+	cp 1
+	jp nz,LEVEL2
+	// init BSCORE with value of BSCORE_SLUG
+	ld a,(BSCORE_SLUG)
+	ld (BSCORE),a
+	// print LEVEL=SLUG
+	ld d,0
+	ld e,25
+	ld hl,STR_LEVEL_SLUG
+	call PRINT_STRING
+	ld a,20
+	ld (SPEED),a
+	jp END_LOAD_LEVEL_BSCORE_SPEED
+LEVEL2:
+	cp 2
+	jp nz,LEVEL3
+	// init BSCORE with address of BSCORE_WORM
+	ld a,(BSCORE_WORM)
+	ld (BSCORE),a
+	// print LEVEL=WORM
+	ld d,0
+	ld e,25
+	ld hl,STR_LEVEL_WORM
+	call PRINT_STRING
+	ld a,10
+	ld (SPEED),a
+	jp END_LOAD_LEVEL_BSCORE_SPEED
 
+LEVEL3:
+	// init BSCORE with address of BSCORE_PYTHON
+	ld a,(BSCORE_PYTHON)
+	ld (BSCORE),a
+	// print LEVEL=PYTHON
+	ld d,0
+	ld e,25
+	ld hl,STR_LEVEL_PYTHON
+	call PRINT_STRING
+	ld a,5
+	ld (SPEED),a
+
+END_LOAD_LEVEL_BSCORE_SPEED:
+
+; print best score
+	call FUNC_PRINT_BSCORE
 
 ; clear SBODY
 	ld hl,SBODY
@@ -65,71 +121,7 @@ LOOP7:
 	jp LOOP7
 END_CLEAR_SBODY:
 
-; init SCORE
-	// print "SCORE=000" at 0,0
-	ld  d,0
-	ld  e,0
-	ld hl,STR_SCORE
-	call PRINT_STRING
-	// reset SCORE to zero
-	ld hl,SCORE
-	ld (hl),$00
-	call FUNC_PRINT_SCORE
 
-
-; print level and init BSCORE
-	ld hl,LEVEL
-	ld a,(hl)
-	cp 1
-	jp nz,LEVEL2
-	// init BSCORE with value of BSCORE_SLUG
-	ld a,(BSCORE_SLUG)
-	ld (BSCORE),a
-	// print LEVEL=SLUG
-	ld d,0
-	ld e,21
-	ld hl,STR_LEVEL_WORM
-	call PRINT_STRING
-	ld a,20
-	ld (WAIT_TIME),a
-	jp INIT_SNAKE
-LEVEL2:
-	cp 2
-	jp nz,LEVEL3
-	// init BSCORE with address of BSCORE_WORM
-	ld a,(BSCORE_WORM)
-	ld (BSCORE),a
-	// print LEVEL=WORM
-	ld d,0
-	ld e,21
-	ld hl,STR_LEVEL_WORM
-	call PRINT_STRING
-	ld a,10
-	ld (WAIT_TIME),a
-	jp INIT_SNAKE
-
-LEVEL3:
-	// init BSCORE with address of BSCORE_PYTHON
-	ld a,(BSCORE_PYTHON)
-	ld (BSCORE),a
-	// print LEVEL=PYTHON
-	ld d,0
-	ld e,21
-	ld hl,STR_LEVEL_PYTHON
-	call PRINT_STRING
-	ld a,5
-	ld (WAIT_TIME),a
-
-; print BEST=xxx
-	ld  d,0
-	ld  e,11
-	ld hl,STR_BSCORE
-	call PRINT_STRING
-	// pull best score
-	ld a,(BSCORE)
-	call FUNC_PRINT_BSCORE
-
-INIT_SNAKE:
 ; snake initial random position in HLINE, HCOL
 ; HLINE = 2+INT(RND*20), HCOL = 2+INT(RND*29)
 	ld b,20
@@ -143,7 +135,6 @@ INIT_SNAKE:
 
 ; snake initial  direction in SDIR
 ; SDIR = (1=right, -1=left, 2=up, -2=down)
-INIT_SNAKE_DIR:
 	ld b,4
 	call FUNC_RAND_NUM
 	add a,1
@@ -187,7 +178,7 @@ END_INIT_SNAKE_DIR:
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-MAIN_LOOP:
+GAME_LOOP:
 ; read keyboard, compute new direction (NDIR)
 RIGHT_KEY_HIT:
 	ld a,$FE
@@ -307,10 +298,10 @@ END_DIR:
 	ld e,(hl)
 	call FUNC_IS_SBODY_PART
 	cp 1
-	jp z,LOST
+	jp z,GAME_LOST
 ; print new head
 	call FUNC_ADD_HEAD
-	ld a,(WAIT_TIME)
+	ld a,(SPEED)
 	ld b,a
 	call FUNC_WAIT
 ; check if snake ate pill
@@ -325,40 +316,36 @@ END_DIR:
 	cp b
 	jp nz,NO_PILL
 ; snake ate pill
-	// update score
-	call FUNC_UPDATE_SCORE
-	// print SCORE
+	call FUNC_UPDATE_SCORE_BSCORE
 	call FUNC_PRINT_SCORE
 	call FUNC_PRINT_BSCORE
-	// print new pill on screen
 	call FUNC_NEW_PILL
-	// and loop
-      jp MAIN_LOOP
+	jp GAME_LOOP
 NO_PILL:
 ; snake did not ate pill
 	// erase tail
 	call FUNC_ERASE_TAIL
-	jp MAIN_LOOP
+	jp GAME_LOOP
 
-LOST:
-; save BSCORE
+GAME_LOST:
+; save BSCORE in corresponding score level (BSCORE_SLUG, BSCORE_WORM, BSCORE_PYTHON)
        ld a,(LEVEL)
        cp 1
        jp nz,LOST_L2
        ld a,(BSCORE)
        ld (BSCORE_SLUG),a
-       jp END_LOST
+       jp END_GAME_LOST
 LOST_L2:
 	cp 2
 	jp nz,LOST_L3
 	ld a,(BSCORE)
 	ld (BSCORE_WORM),a
-	jp END_LOST
+	jp END_GAME_LOST
 LOST_L3:
 	 ld a,(BSCORE)
 	 ld (BSCORE_PYTHON),a
-END_LOST:
-	jp START
+END_GAME_LOST:
+	jp RESTART
 
 FUNC_NEW_PILL:
 	// compute new pill location in (PLINE,PCOL)
@@ -388,40 +375,52 @@ FUNC_NEW_PILL:
 	ret
 
 ////////////////////////
-FUNC_UPDATE_SCORE:
+FUNC_UPDATE_SCORE_BSCORE:
 	ld a,(SCORE)
 	inc a
 	ld (SCORE),a
 	ld b,a
 	ld a,(BSCORE)
-	ret c		// SCORE < BSCORE
-	ld a,b		// SCORE >=BSCORE
+	sub b
+	ret nc		 // SCORE < BSCORE
+	ld a,(SCORE)	      // SCORE >=BSCORE
 	ld (BSCORE),a
+	ret
+
+/////////////////////////
+FUNC_PRINT_HEADER:
+	ld hl, STR_HEADER
+	ld de,0
+	call PRINT_STRING
 	ret
 
 ////////////////////////
 FUNC_PRINT_SCORE:
-	ld de,STR_SCORE+6
+; print score on three digits from position 0,6
+	// convert SCORE to a 3 char string
+	ld de, STR_SCORE
 	ld h,0
 	ld a,(SCORE)
 	ld l,a
 	call FUNC_8BIT_TO_STRING
+	// and print score at 0,6
 	ld d,0
 	ld e,6
-	ld hl, STR_SCORE+6
+	ld hl, STR_SCORE
 	call PRINT_STRING
 	ret
 
 ////////////////////////
 FUNC_PRINT_BSCORE:
-	ld de,STR_BSCORE+5
+	ld de,STR_BSCORE
 	ld h,0
 	ld a,(BSCORE)
 	ld l,a
 	call FUNC_8BIT_TO_STRING
+	// and print best score at 0,15
 	ld d,0
-	ld e,16
-	ld hl, STR_BSCORE+5
+	ld e,15
+	ld hl, STR_BSCORE
 	call PRINT_STRING
 	ret
 
@@ -513,6 +512,26 @@ WAIT_LOOP2:
 	jr	  nz, FUNC_WAIT
 	ret
 
+////////////////////////
+FUNC_CLEAR_SCREEN:
+; clear screen except line 1
+	ld hl,(D_FILE)
+	ld d,0
+	ld e,33
+	add hl,de
+	ld b,23
+	ld c,$00	 // 0 for white char
+L1:
+	inc hl
+	ld a,(hl)
+	cp 118		// testing end of line
+	jp nz,L2
+	djnz L1
+	ret
+
+L2:
+	ld (hl),c
+	jp L1
 
 ////////////////////////
 FUNC_RAND_NUM:
@@ -559,7 +578,7 @@ FUNC_GET_DFILE_ADDRESS:
 ////////////////////////
 FUNC_8BIT_TO_STRING:
 ;INPUT  : hl = number to convert
-;               : de = location of string
+;         de =  string address where to store value
 ;OUTPUT : string at (de)
 	ld	  bc,-100
 	call	Num1
@@ -623,19 +642,24 @@ BSCORE		db $00			// initialized with BEST SCORE of level
 BSCORE_SLUG:	db $00
 BSCORE_WORM:	db $00
 BSCORE_PYTHON:	db $00
-WAIT_TIME	db $00
+SPEED:		db $00
 
-STR_SCORE:	dbzx 'SCORE=000'
+STR_HEADER:	dbzx 'SCORE=000 BEST=    LEVEL='
 		db $FF
-STR_BSCORE:	dbzx 'BEST=000'
+STR_SCORE:	dbzx '000'	       // located at 0,6
 		db $FF
-STR_LEVEL:	dbzx 'LEVEL='
+STR_BSCORE:	dbzx '000'	       // located at 0,15
 		db $FF
-STR_LEVEL_SLUG:    dbzx 'LEVEL=SLUG'
+STR_LEVEL:	dbzx '      '
+		db $FF		       // located at 0,25
+STR_LEVEL_SLUG:
+		dbzx 'SLUG  '
 		db $FF
-STR_LEVEL_WORM:    dbzx 'LEVEL=WORM'
+STR_LEVEL_WORM:
+		dbzx 'WORM  '
 		db $FF
-STR_LEVEL_PYTHON:    dbzx 'LEVEL=PYTHON'
+STR_LEVEL_PYTHON:
+		dbzx 'PYTHON'
 		db $FF
 STR_PICK_LEVEL: dbzx 'CHOSE LEVEL'
 		db $FF
@@ -649,7 +673,7 @@ STR_LEVELS:	db $B8
 END _asm
 
 
-40 RAND USR #START
+60 RAND USR #START
 
 include 'SINCL-ZX\ZX81DISP.INC' 	  ; include D_FILE and needed memory areas
 VARS_ADDR:
