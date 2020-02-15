@@ -1,8 +1,0 @@
-LIST OF BRANCHES
-
-1/ Features
-feature001: implement level (slug, worm,python)
-feature002: best score
-
-2/ Bugs
-bug001: score is not reset when restarting the app
